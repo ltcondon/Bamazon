@@ -1,3 +1,6 @@
+// ==================================== VARIABLES & CONNECTIONS ==========================================
+
+
 // Require node packages:
 var inquirer = require("inquirer");
 var mysql = require("mysql");
@@ -18,18 +21,22 @@ var connection = mysql.createConnection({
     beginPrompt();
   });
 
-  // Begin inquirer prompt:
+
+
+ // ==================================== BEGIN INQUIRER PROMPT ===========================================
+
+
   function beginPrompt() {
     inquirer.prompt([
         
         {
         type: "list",
-        message: "Ahoy there, weary traveler! Care to break for a brief rest and take a peek at my wares?",
+        message: "Ahoy there, weary traveler! Rest those tired legs and have a look'see at me wares, ye won't be dissappointed.",
         choices: ["View items for sale", "View my inventory", "Exit"],
         name: "action"
         }
 
-    // Break into appropriate function:
+    // Redirect to appropriate function:
     ]).then(function(res) {
         switch(res.action) {
 
@@ -40,6 +47,7 @@ var connection = mysql.createConnection({
             return viewMyInventory();
 
             case "Exit":
+            console.log("\nWho needs ye, then!\n\n")
             connection.end();
             return;
 
@@ -48,7 +56,11 @@ var connection = mysql.createConnection({
   }
 
 
-// -- If user elects to view shop inventory: -- 
+
+// ====================================== VIEW SHOP INVENTORY ============================================
+
+
+// -- If user elects to view the shop inventory:
 var gold = 500;
 
 function viewShopInventory() {
@@ -67,20 +79,16 @@ function viewShopInventory() {
 				[res[i].id, res[i].item, res[i].price, res[i].stock]
                 );
         }
-        console.log("\n\n" + table.toString() + "\nYour gold: " + gold + "\n");
+        console.log("\n\n" + table.toString() + "\nYer gold: " + gold + "\n");
 
     // Ask user if they'd like to purchase anything from the shop:
     inquirer.prompt([
         {
             type: "input",
-            message: "Anything that catches your eye, young traveler? \n\n Type the ID of an item you wish to purchase. \n[Enter 'B' to GO BACK or 'Q' to EXIT]",
+            message: "Anything catch yer eye, young traveler?"
+            + "\n\nType the ID of an item you wish to purchase. [Enter 'B' to GO BACK or 'Q' to EXIT]",
             name: "id"
 
-        },
-        {
-            type: "input",
-            message: "Ahh yes, a popular item indeed. How many would you like?",
-            name: "amount"
         }
     
       // According to their answer(s)...:
@@ -90,6 +98,8 @@ function viewShopInventory() {
         if (answer.id.toLowerCase() === "q") {return connection.end();}
         if (answer.id.toLowerCase() === "b") {return beginPrompt();}
 
+ 
+
           // ...and grab corresponding item from inventory:
           connection.query(
             "SELECT * FROM shop_inventory WHERE ?",
@@ -98,13 +108,54 @@ function viewShopInventory() {
 
             }, function(err, res) {
 
-              // Catch any errors, and relay item/amount to purchaseItem function:
-                if (err) throw (err);
-                purchaseItem(res[0], answer.amount)
-        })
+                // if the item chosen does not exist in the inventory:
+                if (typeof(res[0]) === 'undefined') {
+                    inquirer.prompt([
+                        {
+                            type: "list",
+                            message: "Come to waste me time, traveler?! I clearly don't carry such an item!",
+                            choices: ["My mistake, let me look again...", "Sorry, I'll come back later."],
+                            name: "action"
+                        }
+                    ]).then(function(response) {
+                        switch(response.action) {
+                            case "My mistake, let me look again...":
+                            return viewShopInventory();
+    
+                            case "Sorry, I'll come back later.":
+                            console.log("Good riddance!")
+                            return connection.end();
+                        }
+                    })
+                }
+
+              // Otherwise, continue the prompt and ask how many they'll be
+                else {
+
+                    if (err) throw (err);
+
+                    inquirer.prompt([
+                        {
+                            type: "input",
+                            message: "Ah yes, one of me most popular goods." 
+                            + "How many " + res[0].item + "(s) would ye like to purchase?",
+                            name: "amount"
+                        }
+                    ]).then(function(secondAnswer) {
+         
+
+              // Relay item/amount to purchaseItem function:
+                purchaseItem(res[0], secondAnswer.amount)
+          })
+        }
       })
     })
+  })
 }
+
+
+// ========================================= PURCHASE ITEM ===============================================
+
 
 function purchaseItem(item, amount) {
     inquirer.prompt([
@@ -117,7 +168,7 @@ function purchaseItem(item, amount) {
     ]).then(function(answer) {
         switch(answer.purchase) {
             case "No":
-            console.log("All right then, buzz off!");
+            console.log("All right then, be gone with ye!");
             return connection.end();
 
             case "Go Back":
@@ -126,29 +177,51 @@ function purchaseItem(item, amount) {
             case "Yes":
             console.log("\nPurchasing " + amount + " " + item.item + "...\n")
             
-            // If user doesn't have enough gold..
-            if (gold < item.price) {
+            // If user doesn't have enough gold...
+            if ((gold * amount) < (item.price * amount)) {
                 inquirer.prompt([
                     {
                         type: "list",
-                        message: "You don't have enough gold for this purchase! Do I look like a charity to you?!",
-                        choices: ["Whoops, let me look again...", "Sorry, I'll come back later."],
+                        message: "Ye don't have enough gold for this purchase! Do I look like a charity to ye, traveler?!",
+                        choices: ["My mistake, let me look again...", "Sorry, I'll come back later."],
                         name: "action"
                     }
                 ]).then(function(response) {
                     switch(response.action) {
-                        case "Whoops, let me look again...":
+                        case "My mistake, let me look again...":
                         return viewShopInventory();
 
                         case "Sorry, I'll come back later.":
+                        console.log("Good riddance!")
                         return connection.end();
                     }
                 })
             }
+
+            // If the merchant doesn't have enough of the item(s) requested:
+            else if (item.stock < amount) {
+                inquirer.prompt([
+                    {
+                        type: "list",
+                        message: "Here to waste me time, are ye traveler? I clearly don't have enough " + item.item + "(s) for such a purchase!",
+                        choices: ["My mistake, let me look again...", "Sorry, I'll come back later."],
+                        name: "action"
+                    }
+                ]).then(function(response) {
+                    switch(response.action) {
+                        case "My mistake, let me look again...":
+                        return viewShopInventory();
+
+                        case "Sorry, I'll come back later.":
+                        console.log("Good riddance!")
+                        return connection.end();
+                    }
+                })
+            }
+            
+            // If user has enough gold and the merchant has enough stock...            
             else {
                 
-            // If user has enough gold:
-
             connection.query(
                 "INSERT INTO my_inventory SET ?",
                 [{
@@ -172,7 +245,7 @@ function purchaseItem(item, amount) {
                     inquirer.prompt([
                         {
                             type: "list",
-                            message: "Thanks for your business. Care to keep browsing?",
+                            message: "Thanks for yer business. Care to keep browsing?",
                             choices: ["Sure.", "No thanks."],
                             name: "continue"
                         }
@@ -182,7 +255,7 @@ function purchaseItem(item, amount) {
                             return viewShopInventory();
 
                             case "No thanks.":
-                            console.log("All right then. Safe travels, comrade.");
+                            console.log("\nAll right then. Safe travels, comrade.\n\n");
                             return connection.end();
                         }
                     })
@@ -194,33 +267,13 @@ function purchaseItem(item, amount) {
 }
 
 
-// -- If user elects to view their inventory: --
+// ====================================== VIEW USER INVENTORY ============================================
 
+
+// -- If user elects to view their inventory: --
 function viewMyInventory() {
     connection.query("SELECT id, item, count, sell_price FROM my_inventory", function(err, res) {
         if (err) throw (err);
 
-        connection.query("SELECT id, item, count, sell_price FROM my_inventory", function(err, res) {
-            if (err) throw (err);
-    
-            // console.log(res);
-    
-            var table = new Table ({
-                    head: ["Item ID", "Name", "Sell Price", "Count (#)"],
-                    colWidths: [5, 20, 10, 5]
-                });
-    
-            for (var i = 0; i < res.length; i++){
-                table.push(
-                    // ["first value", "second value", "third value", "fourth value", " fifth value"]
-                    [res[i].id, res[i].item, res[i].sell_price, res[i].count]
-                    );
-            }
-        })
-        console.log(table);
-        inquirer.prompt([
-            
-        ])
     })
-    // connection.end();
 }
