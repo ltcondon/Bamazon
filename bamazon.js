@@ -67,13 +67,13 @@ function viewShopInventory() {
 				[res[i].id, res[i].item, res[i].price, res[i].stock]
                 );
         }
-        console.log("\n\n" + table.toString());
+        console.log("\n\n" + table.toString() + "\nYour gold: " + gold + "\n");
 
     // Ask user if they'd like to purchase anything from the shop:
     inquirer.prompt([
         {
             type: "input",
-            message: "Anything that catches your eye, young traveler? [Enter 'B' to GO BACK or 'Q' to EXIT]",
+            message: "Anything that catches your eye, young traveler? \n\n Type the ID of an item you wish to purchase. \n[Enter 'B' to GO BACK or 'Q' to EXIT]",
             name: "id"
 
         },
@@ -104,15 +104,13 @@ function viewShopInventory() {
         })
       })
     })
-    // connection.end();
 }
 
 function purchaseItem(item, amount) {
-    console.log("purchase " + amount + " " + item.item);
     inquirer.prompt([
         {
             type: "list",
-            message: "Purchase " + amount + " " + item.item + "'s?",
+            message: "Purchase " + amount + " " + item.item + "(s)?",
             choices: ["Yes", "No", "Go Back"],
             name: "purchase"
         }
@@ -120,14 +118,77 @@ function purchaseItem(item, amount) {
         switch(answer.purchase) {
             case "No":
             console.log("All right then, buzz off!");
-            break;
+            return connection.end();
 
             case "Go Back":
             return viewShopInventory();
 
             case "Yes":
-            // if (gold > )
-            console.log(amount + item.item + " purchased!")
+            console.log("\nPurchasing " + amount + " " + item.item + "...\n")
+            
+            // If user doesn't have enough gold..
+            if (gold < item.price) {
+                inquirer.prompt([
+                    {
+                        type: "list",
+                        message: "You don't have enough gold for this purchase! Do I look like a charity to you?!",
+                        choices: ["Whoops, let me look again...", "Sorry, I'll come back later."],
+                        name: "action"
+                    }
+                ]).then(function(response) {
+                    switch(response.action) {
+                        case "Whoops, let me look again...":
+                        return viewShopInventory();
+
+                        case "Sorry, I'll come back later.":
+                        return connection.end();
+                    }
+                })
+            }
+            else {
+                
+            // If user has enough gold:
+
+            connection.query(
+                "INSERT INTO my_inventory SET ?",
+                [{
+                    item: item.item,
+                    count: amount,
+                    sell_price: (item.price / 2)
+                }],
+                function(err, res) {
+                    if (err) throw (err);
+                    console.log(res.affectedRows + " purchase(s) made!\n");
+                }
+            )
+            gold -= (item.price * amount);
+            var currentStock = item.stock;
+            connection.query(
+                "UPDATE shop_inventory SET stock = " + (currentStock - amount) + " WHERE id = " + item.id,
+                function(err, res) {
+                    if (err) throw (err);
+                    console.log("\n" + amount + " item(s) were added to your inventory. You have " + gold + " gold remaining.\n");
+                    
+                    inquirer.prompt([
+                        {
+                            type: "list",
+                            message: "Thanks for your business. Care to keep browsing?",
+                            choices: ["Sure.", "No thanks."],
+                            name: "continue"
+                        }
+                    ]).then(function(response) {
+                        switch (response.continue) {
+                            case "Sure.":
+                            return viewShopInventory();
+
+                            case "No thanks.":
+                            console.log("All right then. Safe travels, comrade.");
+                            return connection.end();
+                        }
+                    })
+                }
+            )
+          }
         }
     })
 }
