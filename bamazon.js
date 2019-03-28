@@ -67,8 +67,7 @@ function viewShopInventory() {
 				[res[i].id, res[i].item, res[i].price, res[i].stock]
                 );
         }
-        console.log(table.toString());
-    })
+        console.log("\n\n" + table.toString());
 
     // Ask user if they'd like to purchase anything from the shop:
     inquirer.prompt([
@@ -90,28 +89,47 @@ function viewShopInventory() {
         // Validate input:
         if (answer.id.toLowerCase() === "q") {return connection.end();}
         if (answer.id.toLowerCase() === "b") {return beginPrompt();}
-        if (!typeof(answer.id) === 'number') {
-            console.log("\n\nI don't see any of those in stock...\n\n");
-            return viewShopInventory();
-      }
 
           // ...and grab corresponding item from inventory:
           connection.query(
             "SELECT * FROM shop_inventory WHERE ?",
             {
                 id: answer.id
+
             }, function(err, res) {
-                // Catch any errors, and relay item/amount to purchaseItem function:
+
+              // Catch any errors, and relay item/amount to purchaseItem function:
                 if (err) throw (err);
-                // purchaseItem(res, answer.amount)
-                console.log(res);
+                purchaseItem(res[0], answer.amount)
         })
-        
+      })
     })
+    // connection.end();
 }
 
 function purchaseItem(item, amount) {
-    console.log("purchase " + amount + item.item + "?");
+    console.log("purchase " + amount + " " + item.item);
+    inquirer.prompt([
+        {
+            type: "list",
+            message: "Purchase " + amount + " " + item.item + "'s?",
+            choices: ["Yes", "No", "Go Back"],
+            name: "purchase"
+        }
+    ]).then(function(answer) {
+        switch(answer.purchase) {
+            case "No":
+            console.log("All right then, buzz off!");
+            break;
+
+            case "Go Back":
+            return viewShopInventory();
+
+            case "Yes":
+            // if (gold > )
+            console.log(amount + item.item + " purchased!")
+        }
+    })
 }
 
 
